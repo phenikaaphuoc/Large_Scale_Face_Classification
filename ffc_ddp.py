@@ -3,7 +3,7 @@ from torch.nn import Module
 import math
 import torch.nn.functional as F
 
-from lru_utils import LRU
+from lru_python_impl import LRU
 from resnet_def import create_net
 import os
 import logging as logger
@@ -140,10 +140,8 @@ class FFC(Module):
     def forward_impl(self, p_data, g_data, probe_label, gallery_label):
         p = self.probe_net(p_data)
         with torch.no_grad():  # no gradient to gallery
-            g_single_rank = self.gallery_net(g_data)
-            g = concat_all_gather(g_single_rank)
-            g_label_all_tensor = concat_all_gather(gallery_label)
-            g_label_list = g_label_all_tensor.tolist()
+            g = self.gallery_net(g_data)
+            g_label_list = gallery_label.tolist()
 
         rows = []
         cols = []
@@ -161,16 +159,17 @@ class FFC(Module):
                 cols.append(idx)
                 ones_idx.add(idx)
                 self.queue_position_dict[idx] = (self.queue_position_dict[idx] + 1) % 2
-
-        r = torch.LongTensor(rows).cuda(g.device)
-        c = torch.LongTensor(cols).cuda(g.device)
+#####
+        r = torch.LongTensor(rows).to(g.device)
+        c = torch.LongTensor(cols).to(g.device)
         with torch.no_grad():
             self.queue[r, c] = g
         fake_labels = []
         probe_label_list = probe_label.tolist()
         for pl in probe_label_list:
             fake_labels.append(self.lru.view(pl))
-        label = torch.LongTensor(fake_labels).cuda(p.device)
+####
+        label = torch.LongTensor(fake_labels).to(p.device)
 
         cos_theta1 = F.linear(p, self.queue[0]) 
         mask_idx = torch.LongTensor(list(ones_idx))
@@ -186,10 +185,9 @@ class FFC(Module):
         p = self.probe_net(p_data)
         with torch.no_grad():  # no gradient to gallery
             self._momentum_update_gallery() # update the gallery net
-            g_single_rank = self.gallery_net(g_data)
-            g = concat_all_gather(g_single_rank)
-            g_label_all_tensor = concat_all_gather(gallery_label)
-            g_label_list = g_label_all_tensor.tolist()
+            g = self.gallery_net(g_data)
+            g_label_list = gallery_label.tolist()
+        # import pdb;pdb.set_trace()
         rows = []
         cols = []
         old_state = {}
@@ -212,9 +210,9 @@ class FFC(Module):
                 ones_idx.add(idx)
                 self.queue_position_dict[idx] = (self.queue_position_dict[idx] + 1) % 2
             steps += 1
-
-        r = torch.LongTensor(rows).cuda(g.device)
-        c = torch.LongTensor(cols).cuda(g.device)
+#######
+        r = torch.LongTensor(rows).to(g.device)
+        c = torch.LongTensor(cols).to(g.device)
         with torch.no_grad():
             old_tensor = self.queue[r, c]  
             self.queue[r, c] = g
@@ -222,7 +220,8 @@ class FFC(Module):
         probe_label_list = probe_label.tolist()
         for pl in probe_label_list:
             fake_labels.append(self.lru.view(pl))
-        label = torch.LongTensor(fake_labels).cuda(p.device)
+#######
+        label = torch.LongTensor(fake_labels).to(p.device)
 
         cos_theta1 = F.linear(p, self.queue[0]) 
         # mask = mask.cuda(g.device)
