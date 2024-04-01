@@ -112,12 +112,8 @@ def train(conf):
     # id_loader = DataLoader(id_db, conf.batch_size, False, id_sampler, num_workers=8, pin_memory=False, drop_last=True)
     # logger.info('#class %d' % instance_db.num_class)
 
-    # net = FFC(conf.net_type, conf.feat_dim, conf.queue_size, conf.scale, conf.loss_type, conf.margin,
-    #           conf.alpha, conf.neg_margin, conf.pretrained_model_path,num_class=num_class).cuda(conf.local_rank)
-    
-    num_class = 1000
     net = FFC(conf.net_type, conf.feat_dim, conf.queue_size, conf.scale, conf.loss_type, conf.margin,
-              conf.alpha, conf.neg_margin, conf.pretrained_model_path,num_class=num_class)
+              conf.alpha, conf.neg_margin, conf.pretrained_model_path,num_class=conf.num_class).to(conf.device)
 
     if conf.sync_bn:
         sync_net = torch.nn.SyncBatchNorm.convert_sync_batchnorm(net)
@@ -136,19 +132,14 @@ def train(conf):
             lr_scheduler.update(epoch, 0.0)
         id_loader = 1
         instance_loader = 1
-        real_iter = train_one_epoch(id_loader, instance_loader, ffc_net, optim, epoch, conf, conf.saved_dir, real_iter, scaler, optim_config['scheduler'], lr_scheduler, optim_config['warmup'], optim_config['epochs'])
+        real_iter = train_one_epoch(id_loader, instance_loader, ffc_net, optim, epoch, conf, conf.saved_dir, real_iter, scaler, optim_config['scheduler'], lr_scheduler, optim_config['epochs'])
 
 
 if __name__ == '__main__':
     conf = argparse.ArgumentParser(description='fast face classification.')
-    # conf.add_argument('ip', type=str)
-    # conf.add_argument('port', type=int)
-    # conf.add_argument('local_rank', type=int)
-    # conf.add_argument('global_rank', type=int)
-    # conf.add_argument('world_size', type=int)
     
     conf.add_argument('--saved_dir',default="experiments", type=str, help='snapshot directory')
-
+    conf.add_argument('--device',type=str,default='cuda')
     conf.add_argument('--net_type', type=str, default='mobile', help='backbone type')
     conf.add_argument('--queue_size', type=int, default=7409, help='size of the queue.')
     conf.add_argument('--print_freq', type=int, default=1000, help='The print frequency for training state.')
@@ -161,14 +152,10 @@ if __name__ == '__main__':
     conf.add_argument('--neg_margin', type=float, default=0.25, help='scaling parameter ')
     conf.add_argument('--sync_bn', action='store_true', default=False)
     conf.add_argument('--feat_dim', type=int, default=512, help='feature dimension.')
+    conf.add_argument('--num_class', type=int, default=500, help='feature dimension.')
     args = conf.parse_args()
-    # Initialize the process group with TCP initialization method
-    dist.init_process_group(backend='gloo', init_method='tcp://localhost:23456', rank=0, world_size=1)
 
     logger.info('Start optimization.')
-    
-    args.source_lmdb = ['/path to msceleb.lmdb']
-    args.source_file = ['/path to kv file']
     logger.info(args)
     os.makedirs(args.saved_dir,exist_ok=True)
     train(args)
