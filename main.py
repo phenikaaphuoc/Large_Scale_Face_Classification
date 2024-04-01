@@ -28,7 +28,7 @@ def get_lr(optimizer):
 
 
 def train_one_epoch(id_loader, instance_loader, ffc_net, optimizer,
-                    cur_epoch, conf, saved_dir, real_iter, scaler, lr_policy, lr_scheduler, warmup_epochs, max_epochs):
+                    cur_epoch, conf, saved_dir, real_iter, scaler, lr_policy, lr_scheduler, max_epochs):
     """Tain one epoch by traditional training.
     """
     
@@ -113,7 +113,8 @@ def train(conf):
     # logger.info('#class %d' % instance_db.num_class)
 
     net = FFC(conf.net_type, conf.feat_dim, conf.queue_size, conf.scale, conf.loss_type, conf.margin,
-              conf.alpha, conf.neg_margin, conf.pretrained_model_path,num_class=conf.num_class).to(conf.device)
+              conf.alpha, conf.neg_margin, conf.pretrained_model_path,num_class=conf.num_class)
+    logger.info(next(net.gallery_net.parameters()).device)
 
     if conf.sync_bn:
         sync_net = torch.nn.SyncBatchNorm.convert_sync_batchnorm(net)
